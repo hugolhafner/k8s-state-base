@@ -1,0 +1,6 @@
+{
+  "appName": "argocd",
+  "source": {
+    "targetRevision": "9.2.3"
+  }
+}

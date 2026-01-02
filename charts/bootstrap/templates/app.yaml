@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: k8s-state-base-bootstrap
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  project: k8s-state-base
+  sources:
+    - path: charts/bootstrap-apps
+      repoURL: https://github.com/hugolhafner/k8s-state-base
+      targetRevision: HEAD
+      helm:
+        releaseName: k8s-state-base
+        valuesObject:
+          clusterName: "{{ .Values.clusterName }}"
+        valueFiles:
+          - "$values/clusters/{{ .Values.clusterName }}/bootstrap.yaml"
+
+    - repoURL: https://github.com/hugolhafner/k8s-state-base.git
+      targetRevision: HEAD
+      ref: values
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      refresh: true
+
+  ignoreDifferences:
+    - group: argoproj.io
+      kind: Application
+      jsonPointers:
+        - /spec/syncPolicy

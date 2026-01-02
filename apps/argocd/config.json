@@ -1,0 +1,7 @@
+{
+  "appName": "argocd",
+  "source": {
+    "repoURL": "https://argoproj.github.io/argo-helm",
+    "chart": "argo-cd"
+  }
+}

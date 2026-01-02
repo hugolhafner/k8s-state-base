@@ -1,0 +1,68 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: k8s-state-base
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - merge:
+        mergeKeys:
+          - appName
+        generators:
+          - git:
+              repoURL: https://github.com/hugolhafner/k8s-state-base.git
+              revision: HEAD
+              files:
+                - path: apps/*/config.json
+              pathParamPrefix: baseApp
+
+          - git:
+              repoURL: https://github.com/hugolhafner/k8s-state-base.git
+              revision: HEAD
+              files:
+                - path: "clusters/{{ .Values.clusterName }}/apps/*/config.json"
+              pathParamPrefix: clusterApp
+
+  template:
+    metadata:
+      name: {{ printf "%s" "{{ .appName }}" | quote }}
+    spec:
+      project: k8s-state-base
+      sources:
+        - repoURL: {{ printf "%s" "{{ .source.repoURL }}" | quote }}
+          targetRevision: {{ printf "%s" "{{ .source.targetRevision }}" | quote }}
+          chart: {{ printf "%s" "{{ index .source \"chart\" | default .appName }}" | quote }}
+          helm:
+            releaseName: {{ printf "%s" "{{ .appName }}" | quote }}
+            ignoreMissingValueFiles: true
+            valueFiles:
+              - {{ printf "$values/%s/values.yaml" "{{ .baseApp.path.path }}" | quote }}
+              {{- range $k, $v := .Values.labels }}
+              - {{ printf "$values/%s/mixins/%s/%s.yaml" "{{ .baseApp.path.path }}" $k $v | quote }}
+              {{- end }}
+              - {{ printf "$values/%s/values.yaml" "{{ .clusterApp.path.path }}" | quote }}
+              {{- range $k, $v := .Values.labels }}
+              - {{ printf "$values/%s/mixins/%s/%s.yaml" "{{ .clusterApp.path.path }}" $k $v | quote }}
+              {{- end }}
+        - repoURL: https://github.com/hugolhafner/k8s-state-base.git
+          targetRevision: HEAD
+          ref: values
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: {{ printf "%s" "{{ .appName }}" | quote }}
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          refresh: true
+        syncOptions:
+          - CreateNamespace=true
+
+      ignoreDifferences:
+        - group: argoproj.io
+          kind: Application
+          jsonPointers:
+            - /spec/syncPolicy
